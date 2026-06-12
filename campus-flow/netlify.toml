@@ -1,0 +1,20 @@
+[build]
+  publish = "artifacts/pulsepass/dist/public"
+  command = "pnpm install && pnpm --filter @workspace/pulsepass run build && pnpm exec esbuild netlify/functions/api.ts --bundle --format=esm --platform=node --target=es2022 --packages=bundle --outfile=netlify/functions/api-bundled.mjs"
+
+[functions]
+  directory = "netlify/functions"
+  node_bundler = "esbuild"
+
+[[redirects]]
+  from = "/api/*"
+  to = "/.netlify/functions/api/:splat"
+  status = 200
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+[context.production.environment]
+  NODE_ENV = "production"

@@ -1,0 +1,834 @@
+Here's a **comprehensive implementation prompt** for Replit. It includes all 3 phases, with detailed instructions, code snippets, and configuration steps. I've structured it so Replit can work through it systematically.
+
+---
+
+# 📋 REPLIT IMPLEMENTATION PROMPT
+
+Copy everything below this line and paste it into Replit:
+
+---
+
+# Campus Flow Upgrade - Full Feature Implementation
+
+## Project Context
+- Monorepo: pnpm workspaces
+- Frontend: Vite + React + TypeScript + TailwindCSS (in `artifacts/pulsepass/`)
+- Backend: Netlify Functions in `netlify/functions/api.ts` (bundled with esbuild)
+- Database: Neon PostgreSQL via Drizzle ORM (schema in `lib/db/src/schema/`)
+- Auth: JWT in HTTP-only cookies, bcrypt for password hashing
+- Existing roles: `student`, `admin`, `security`
+- Existing tables: `users`, `exeat_requests`
+- Build command: `pnpm install && pnpm --filter @workspace/pulsepass run build && pnpm exec esbuild netlify/functions/api.ts --bundle --format=esm --platform=node --target=es2022 --packages=bundle --outfile=netlify/functions/api-bundled.mjs`
+- IMPORTANT: After editing `lib/db/src/schema/`, you MUST copy it to `netlify/functions/_db/schema.ts` and re-run the build.
+
+---
+
+## PHASE 1: Porters, 2-Step Exeat Flow, Room Field
+
+### Step 1.1: Update Database Schema
+
+Edit `lib/db/src/schema/index.ts`. Add to the `users` table:
+- `room: varchar("room", { length: 50 })` (nullable, only for students)
+
+Add to the `exeat_requests` table (add new columns, do not change existing ones):
+- `hostelCheckedOutBy: uuid("hostel_checked_out_by").references(() => users.id, { onDelete: "set null" })`
+- `hostelCheckedOutAt: timestamp("hostel_checked_out_at", { withTimezone: true })`
+- `hostelCheckedInBy: uuid("hostel_checked_in_by").references(() => users.id, { onDelete: "set null" })`
+- `hostelCheckedInAt: timestamp("hostel_checked_in_at", { withTimezone: true })`
+- `gateScannedOutBy: uuid("gate_scanned_out_by").references(() => users.id, { onDelete: "set null" })`
+- `gateScannedOutAt: timestamp("gate_scanned_out_at", { withTimezone: true })`
+- `gateScannedInBy: uuid("gate_scanned_in_by").references(() => users.id, { onDelete: "set null" })`
+- `gateScannedInAt: timestamp("gate_scanned_in_at", { withTimezone: true })`
+
+After editing the schema:
+```bash
+# 1. Generate migration
+pnpm --filter @workspace/db run push
+
+# 2. Apply it to your Neon DB
+# Follow the prompts (type 'y' to confirm)
+
+# 3. Copy the updated schema into the function folder
+cp lib/db/src/schema/index.ts netlify/functions/_db/schema.ts
+```
+
+### Step 1.2: Update JWT Payload to Include `hostel`
+
+Edit `netlify/functions/api.ts`. Update the `JwtPayload` type:
+```ts
+type JwtPayload = { userId: string; role: Role; name: string; hostel: string | null };
+```
+
+### Step 1.3: Update Signup Endpoint to Accept `room` (Students Only)
+
+In the `/auth/signup` handler, after extracting `body`, add:
+```ts
+const { room } = body;  // add to destructure
+// ...
+matric: role === "student" ? matric : null,
+hostel: role === "student" ? hostel : null,
+room: role === "student" ? (room || null) : null,  // add this line
+```
+
+When signing the JWT, include `hostel`:
+```ts
+const token = signToken({ userId: user.id, role: user.role, name: user.name, hostel: user.hostel });
+```
+
+Update `/auth/login` and `/auth/me` the same way (include `hostel` and `room` in the JWT and response).
+
+### Step 1.4: Add Admin Endpoint to Create Porters
+
+In `netlify/functions/api.ts`, add a new route (place it after the existing admin exeat routes):
+```ts
+// Admin creates a porter
+if (path === "/porters/create" && method === "POST") {
+  if (payload.role !== "admin") return json({ error: "Forbidden" }, 403);
+  const body = await req.json();
+  const { email, password, name, hostel } = body;
+  if (!email || !password || !name || !hostel) return json({ error: "Missing fields" }, 400);
+
+  const norm = email.toLowerCase().trim();
+  const existing = await db.select({ id: users.id }).from(users).where(eq(users.email, norm)).limit(1);
+  if (existing.length) return json({ error: "Email already registered" }, 409);
+
+  const passwordHash = await hashPassword(password);
+  const [porter] = await db.insert(users).values({
+    email: norm,
+    passwordHash,
+    name,
+    role: "porter",
+    hostel,
+  }).returning();
+
+  return json({ id: porter.id, email: porter.email, name: porter.name, role: porter.role, hostel: porter.hostel }, 201);
+}
+
+// List all porters (admin)
+if (path === "/porters" && method === "GET") {
+  if (payload.role !== "admin") return json({ error: "Forbidden" }, 403);
+  const porters = await db.select({
+    id: users.id,
+    email: users.email,
+    name: users.name,
+    hostel: users.hostel,
+    createdAt: users.createdAt,
+  }).from(users).where(eq(users.role, "porter")).orderBy(desc(users.createdAt));
+  return json(porters);
+}
+
+// Delete a porter (admin)
+if (path === "/porters/:id" && method === "DELETE") {
+  if (payload.role !== "admin") return json({ error: "Forbidden" }, 403);
+  const porterId = path.split("/")[2];
+  await db.delete(users).where(and(eq(users.id, porterId), eq(users.role, "porter")));
+  return json({ ok: true });
+}
+```
+
+### Step 1.5: Add Porter Login
+
+```ts
+// Porter self-login
+if (path === "/porter/login" && method === "POST") {
+  const body = await req.json();
+  const db = getDb();
+  const norm = (body.email ?? "").toLowerCase().trim();
+  const [user] = await db.select().from(users).where(and(eq(users.email, norm), eq(users.role, "porter"))).limit(1);
+  if (!user) return json({ error: "Invalid email or password" }, 401);
+  const ok = await verifyPassword(body.password ?? "", user.passwordHash);
+  if (!ok) return json({ error: "Invalid email or password" }, 401);
+  const token = signToken({ userId: user.id, role: user.role, name: user.name, hostel: user.hostel });
+  return json({ id: user.id, email: user.email, name: user.name, role: user.role, hostel: user.hostel }, 200, {
+    "Set-Cookie": cookieHeader("pulsepass_token", token, 30 * 24 * 3600),
+  });
+}
+```
+
+Add `and` to your drizzle-orm imports at the top of the file.
+
+### Step 1.6: Update Porter Scan Logic
+
+Replace the existing `/exeats/scan` handler logic for security with a NEW `/porters/scan` endpoint (porters), then update security's scan to enforce the 2-step rule.
+
+```ts
+// Porter scans student at hostel
+if (path === "/porters/scan" && method === "POST") {
+  if (payload.role !== "porter") return json({ error: "Forbidden" }, 403);
+  if (!payload.hostel) return json({ error: "Porter has no hostel assigned" }, 400);
+
+  const body = await req.json();
+  const code = (body.code ?? "").trim().toUpperCase();
+
+  // Find the request + student
+  const [found] = await db.select().from(exeatRequests).leftJoin(users, eq(exeatRequests.studentId, users.id)).where(eq(exeatRequests.code, code)).limit(1);
+  if (!found) return json({ kind: "invalid", message: "Pass not recognized." });
+
+  const e = found.exeat_requests;
+  const student = found.users;
+
+  // Verify the student belongs to this porter's hostel
+  if (student?.hostel !== payload.hostel) {
+    return json({ kind: "wrong_hostel", message: `Student is from ${student?.hostel ?? "unknown hostel"}, not yours.` });
+  }
+
+  // Check out at hostel
+  if (e.status === "approved") {
+    await db.update(exeatRequests).set({
+      status: "hostel_checked_out",
+      hostelCheckedOutBy: payload.userId,
+      hostelCheckedOutAt: new Date(),
+      updatedAt: new Date(),
+    }).where(eq(exeatRequests.id, e.id));
+    return json({ kind: "hostel-out", message: `${student?.name ?? "Student"} checked out of hostel.`, studentName: student?.name, destination: e.destination });
+  }
+
+  // Check in at hostel
+  if (e.status === "returned") {
+    await db.update(exeatRequests).set({
+      status: "hostel_returned",
+      hostelCheckedInBy: payload.userId,
+      hostelCheckedInAt: new Date(),
+      updatedAt: new Date(),
+    }).where(eq(exeatRequests.id, e.id));
+    return json({ kind: "hostel-in", message: `${student?.name ?? "Student"} checked in at hostel.` });
+  }
+
+  return json({ kind: "invalid_state", message: `Cannot scan at hostel when status is "${e.status}".` });
+}
+```
+
+### Step 1.7: Update Security Scan to Enforce 2-Step Rule
+
+Replace the existing `/exeats/scan` handler with:
+```ts
+if (path === "/exeats/scan" && method === "POST") {
+  if (payload.role !== "security") return json({ error: "Forbidden" }, 403);
+  const body = await req.json();
+  const code = (body.code ?? "").trim().toUpperCase();
+  const [found] = await db.select().from(exeatRequests).leftJoin(users, eq(exeatRequests.studentId, users.id)).where(eq(exeatRequests.code, code)).limit(1);
+  if (!found) return json({ kind: "invalid", message: "Pass not recognized." });
+  const e = found.exeat_requests;
+
+  // Scan OUT at gate — only allowed after hostel check-out
+  if (e.status === "hostel_checked_out") {
+    await db.update(exeatRequests).set({
+      status: "departed",
+      gateScannedOutBy: payload.userId,
+      gateScannedOutAt: new Date(),
+      updatedAt: new Date(),
+    }).where(eq(exeatRequests.id, e.id));
+    return json({ kind: "valid-out", message: `${found.users?.name ?? "Student"} cleared to depart.`, studentName: found.users?.name, destination: e.destination, returnDate: e.returnDate });
+  }
+
+  // Scan IN at gate — allowed when departed
+  if (e.status === "departed") {
+    await db.update(exeatRequests).set({
+      status: "returned",
+      gateScannedInBy: payload.userId,
+      gateScannedInAt: new Date(),
+      updatedAt: new Date(),
+    }).where(eq(exeatRequests.id, e.id));
+    return json({ kind: "valid-in", message: `${found.users?.name ?? "Student"} returned to campus. Student must now check in at hostel.` });
+  }
+
+  // Reject if scanned out of order
+  if (e.status === "approved") {
+    return json({ kind: "not_checked_out_of_hostel", message: "Student has not checked out of hostel yet." });
+  }
+
+  return json({ kind: "expired", message: `Pass status: ${e.status}. Cannot scan.` });
+}
+```
+
+### Step 1.8: Update `toDTO` to Include All New Fields
+
+```ts
+function toDTO(row: { exeat_requests: typeof exeatRequests.$inferSelect; users: typeof users.$inferSelect | null }) {
+  const e = row.exeat_requests;
+  return {
+    id: e.id,
+    code: e.code,
+    studentId: e.studentId,
+    studentName: row.users?.name ?? "Unknown",
+    matric: row.users?.matric,
+    hostel: row.users?.hostel,
+    room: row.users?.room,
+    destination: e.destination,
+    reason: e.reason,
+    type: e.type,
+    departDate: e.departDate,
+    returnDate: e.returnDate,
+    status: e.status,
+    rejectReason: e.rejectReason,
+    hostelCheckedOutBy: e.hostelCheckedOutBy,
+    hostelCheckedOutAt: e.hostelCheckedOutAt?.toISOString() ?? null,
+    hostelCheckedInBy: e.hostelCheckedInBy,
+    hostelCheckedInAt: e.hostelCheckedInAt?.toISOString() ?? null,
+    gateScannedOutBy: e.gateScannedOutBy,
+    gateScannedOutAt: e.gateScannedOutAt?.toISOString() ?? null,
+    gateScannedInBy: e.gateScannedInBy,
+    gateScannedInAt: e.gateScannedInAt?.toISOString() ?? null,
+    createdAt: e.createdAt.toISOString(),
+    updatedAt: e.updatedAt.toISOString(),
+  };
+}
+```
+
+### Step 1.9: Update `users` DTO to Include Room
+
+In the signup/login/me handlers, add `"room": user.room` to the response JSON.
+
+### Step 1.10: Frontend — Update Signup Form
+
+Find the student signup page (likely `artifacts/pulsepass/client/src/pages/signup.tsx`). Add a "Room" field after Hostel:
+```tsx
+<div>
+  <label>Room</label>
+  <input
+    type="text"
+    name="room"
+    placeholder="e.g., Block A, Room 12"
+    value={formData.room}
+    onChange={handleChange}
+  />
+</div>
+```
+
+Update the form submission to include `room: formData.room`.
+
+### Step 1.11: Frontend — Add Porter Login Page
+
+Create `artifacts/pulsepass/client/src/pages/porter-login.tsx`. Mirror the existing login page but with a link to `/api/porter/login`. Also create a porter dashboard at `artifacts/pulsepass/client/src/pages/porter-dashboard.tsx` with a QR scanner (reuse your existing `html5-qrcode` setup from the security scanner page).
+
+### Step 1.12: Frontend — Admin: Porter Management Page
+
+Create `artifacts/pulsepass/client/src/pages/admin-porters.tsx`:
+- Form to create new porter (email, password, name, hostel dropdown — hardcode the list of hostels or fetch from a `/hostels` endpoint)
+- Table listing all porters with delete buttons
+
+### Step 1.13: Frontend — Update Security Scanner Messages
+
+Find the security scanner page. Update the error/success display to handle the new `kind` values from `/exeats/scan`:
+- `not_checked_out_of_hostel` → "Student has not checked out of hostel yet"
+- `valid-in` → add a follow-up hint: "Student must now check in at hostel"
+
+### Step 1.14: Frontend — Update Admin Dashboard
+
+The admin's exeat list/detail should now show:
+- All 5 status values
+- The 4 new timestamps (hostel out, gate out, gate in, hostel in)
+- The names of the porters/security who scanned (you may need to do an additional join to fetch user names — consider a `/exeats/:id/details` endpoint that returns everything)
+
+Add a new endpoint in `api.ts`:
+```ts
+if (path.startsWith("/exeats/details/") && method === "GET") {
+  if (payload.role !== "admin") return json({ error: "Forbidden" }, 403);
+  const exeatId = path.split("/")[3];
+  // Query exeat + all scan actors
+  const [row] = await db.select().from(exeatRequests).leftJoin(users, eq(exeatRequests.studentId, users.id)).where(eq(exeatRequests.id, exeatId)).limit(1);
+  if (!row) return json({ error: "Not found" }, 404);
+
+  // Fetch the names of the people who scanned
+  const actorIds = [row.exeat_requests.hostelCheckedOutBy, row.exeat_requests.hostelCheckedInBy, row.exeat_requests.gateScannedOutBy, row.exeat_requests.gateScannedInBy].filter(Boolean) as string[];
+  const actors = actorIds.length ? await db.select({ id: users.id, name: users.name, role: users.role }).from(users).where(inArray(users.id, actorIds)) : [];
+  const actorMap = Object.fromEntries(actors.map(a => [a.id, a]));
+
+  return json({
+    ...toDTO(row),
+    hostelCheckedOutByName: row.exeat_requests.hostelCheckedOutBy ? actorMap[row.exeat_requests.hostelCheckedOutBy]?.name : null,
+    hostelCheckedInByName: row.exeat_requests.hostelCheckedInBy ? actorMap[row.exeat_requests.hostelCheckedInBy]?.name : null,
+    gateScannedOutByName: row.exeat_requests.gateScannedOutBy ? actorMap[row.exeat_requests.gateScannedOutBy]?.name : null,
+    gateScannedInByName: row.exeat_requests.gateScannedInBy ? actorMap[row.exeat_requests.gateScannedInBy]?.name : null,
+  });
+}
+```
+
+Add `inArray` to the drizzle-orm imports.
+
+### Step 1.15: Deploy
+
+```bash
+cp lib/db/src/schema/index.ts netlify/functions/_db/schema.ts
+git add .
+git commit -m "Phase 1: Porter role + 2-step exeat flow + room field"
+git push
+```
+
+Verify on Netlify that the build succeeds. Test the flow end-to-end.
+
+---
+
+## PHASE 2: In-App Notifications
+
+### Step 2.1: Add `notifications` Table
+
+Add to `lib/db/src/schema/index.ts`:
+```ts
+export const notifications = pgTable("notifications", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  type: varchar("type", { length: 50 }).notNull(),  // 'exeat_approved', 'exeat_rejected', 'exeat_hostel_out', etc.
+  title: varchar("title", { length: 200 }).notNull(),
+  body: text("body").notNull(),
+  exeatId: uuid("exeat_id").references(() => exeatRequests.id, { onDelete: "cascade" }),
+  readAt: timestamp("read_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [
+  index("idx_notif_user").on(t.userId),
+  index("idx_notif_read").on(t.readAt),
+]);
+```
+
+Run `pnpm --filter @workspace/db run push` to apply.
+
+### Step 2.2: Add Notification Helper to `api.ts`
+
+```ts
+async function notify(db: ReturnType<typeof getDb>, userId: string, type: string, title: string, body: string, exeatId?: string) {
+  await db.insert(notifications).values({ userId, type, title, body, exeatId });
+}
+```
+
+Add `notifications` to the imports from `_db/schema`.
+
+### Step 2.3: Trigger Notifications in Key Handlers
+
+- **Admin approves exeat** (`/exeats/review`): notify the student
+- **Admin rejects exeat**: notify the student
+- **Porter scans student out**: notify the student
+- **Security scans student out (gate)**: notify the student
+- **Security scans student in (gate)**: notify the student
+- **Porter scans student in (hostel)**: notify the student (final state)
+- **New exeat request created**: notify all admins (query: `db.select({id: users.id}).from(users).where(eq(users.role, "admin"))`)
+- **New porter created**: notify all admins
+
+### Step 2.4: Add Notification API Endpoints
+
+```ts
+// Get my notifications
+if (path === "/notifications" && method === "GET") {
+  if (!payload) return json({ error: "Not authenticated" }, 401);
+  const rows = await db.select().from(notifications)
+    .where(eq(notifications.userId, payload.userId))
+    .orderBy(desc(notifications.createdAt))
+    .limit(50);
+  return json(rows.map(n => ({ ...n, createdAt: n.createdAt.toISOString(), readAt: n.readAt?.toISOString() ?? null })));
+}
+
+// Mark notification as read
+if (path.startsWith("/notifications/") && path.endsWith("/read") && method === "POST") {
+  if (!payload) return json({ error: "Not authenticated" }, 401);
+  const notifId = path.split("/")[2];
+  await db.update(notifications).set({ readAt: new Date() }).where(and(eq(notifications.id, notifId), eq(notifications.userId, payload.userId)));
+  return json({ ok: true });
+}
+
+// Mark all as read
+if (path === "/notifications/read-all" && method === "POST") {
+  if (!payload) return json({ error: "Not authenticated" }, 401);
+  await db.update(notifications).set({ readAt: new Date() }).where(and(eq(notifications.userId, payload.userId), isNull(notifications.readAt)));
+  return json({ ok: true });
+}
+```
+
+Add `isNull` to drizzle-orm imports.
+
+### Step 2.5: Frontend — Notification Bell
+
+Create `artifacts/pulsepass/client/src/components/notification-bell.tsx`:
+- Polls `/notifications` every 30 seconds (or use TanStack Query with `refetchInterval: 30000`)
+- Shows a red badge with unread count
+- Clicking opens a dropdown with the latest 10 notifications
+- Each notification has a "Mark as read" button
+- "Mark all as read" button at the top
+
+Add the bell to your main layout (probably `artifacts/pulsepass/client/src/components/layout.tsx` or `app.tsx`).
+
+### Step 2.6: Deploy Phase 2
+
+```bash
+cp lib/db/src/schema/index.ts netlify/functions/_db/schema.ts
+git add .
+git commit -m "Phase 2: In-app notifications"
+git push
+```
+
+---
+
+## PHASE 3: Browser Push Notifications + Biometric Login
+
+### Step 3.1: Generate VAPID Keys for Web Push
+
+Run locally (you need to do this once and commit the public key to the frontend, keep the private key as a Netlify env var):
+```bash
+npx web-push generate-vapid-keys
+```
+
+You'll get:
+- **Public key** (safe to commit, frontend needs this)
+- **Private key** (NEVER commit, add to Netlify env vars as `VAPID_PRIVATE_KEY`)
+
+Add to Netlify env vars (Site settings → Environment variables):
+- `VAPID_PUBLIC_KEY` = (your public key)
+- `VAPID_PRIVATE_KEY` = (your private key)
+- `VAPID_SUBJECT` = `mailto:admin@your-domain.com`
+
+Add the public key to your frontend as a constant or env var (`VITE_VAPID_PUBLIC_KEY`).
+
+### Step 3.2: Install `web-push` on the Backend
+
+```bash
+pnpm add -w web-push
+```
+
+### Step 3.3: Add `push_subscriptions` Table
+
+Add to `lib/db/src/schema/index.ts`:
+```ts
+export const pushSubscriptions = pgTable("push_subscriptions", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  endpoint: text("endpoint").notNull().unique(),
+  p256dh: text("p256dh").notNull(),
+  auth: text("auth").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [
+  index("idx_push_user").on(t.userId),
+]);
+```
+
+Run `pnpm --filter @workspace/db run push`.
+
+### Step 3.4: Add Push Subscription Endpoints to `api.ts`
+
+```ts
+import webpush from "web-push";
+
+webpush.setVapidDetails(
+  process.env.VAPID_SUBJECT!,
+  process.env.VAPID_PUBLIC_KEY!,
+  process.env.VAPID_PRIVATE_KEY!
+);
+
+// Subscribe to push
+if (path === "/push/subscribe" && method === "POST") {
+  if (!payload) return json({ error: "Not authenticated" }, 401);
+  const subscription = await req.json();
+  await db.insert(pushSubscriptions).values({
+    userId: payload.userId,
+    endpoint: subscription.endpoint,
+    p256dh: subscription.keys.p256dh,
+    auth: subscription.keys.auth,
+  }).onConflictDoNothing();
+  return json({ ok: true });
+}
+
+// Unsubscribe
+if (path === "/push/unsubscribe" && method === "POST") {
+  if (!payload) return json({ error: "Not authenticated" }, 401);
+  const { endpoint } = await req.json();
+  await db.delete(pushSubscriptions).where(and(eq(pushSubscriptions.userId, payload.userId), eq(pushSubscriptions.endpoint, endpoint)));
+  return json({ ok: true });
+}
+```
+
+### Step 3.5: Update `notify()` to Also Send Push
+
+```ts
+async function notify(db: ReturnType<typeof getDb>, userId: string, type: string, title: string, body: string, exeatId?: string) {
+  // In-app notification
+  await db.insert(notifications).values({ userId, type, title, body, exeatId });
+
+  // Push notification
+  const subs = await db.select().from(pushSubscriptions).where(eq(pushSubscriptions.userId, userId));
+  const payload = JSON.stringify({ title, body, url: exeatId ? `/exeats/${exeatId}` : "/" });
+  await Promise.allSettled(subs.map(s =>
+    webpush.sendNotification(
+      { endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } },
+      payload
+    ).catch(async (err) => {
+      // If subscription is dead, remove it
+      if (err.statusCode === 404 || err.statusCode === 410) {
+        await db.delete(pushSubscriptions).where(eq(pushSubscriptions.endpoint, s.endpoint));
+      }
+    })
+  ));
+}
+```
+
+### Step 3.6: Frontend — Service Worker
+
+Create `artifacts/pulsepass/public/sw.js` (or wherever your public assets go):
+```js
+self.addEventListener("push", (event) => {
+  const data = event.data ? event.data.json() : { title: "New notification", body: "" };
+  event.waitUntil(
+    self.registration.showNotification(data.title, {
+      body: data.body,
+      icon: "/icon.png",
+      badge: "/badge.png",
+      data: { url: data.url || "/" },
+    })
+  );
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  event.waitUntil(clients.openWindow(event.notification.data.url));
+});
+```
+
+Register the service worker in your main `app.tsx` or layout:
+```ts
+useEffect(() => {
+  if ("serviceWorker" in navigator) {
+    navigator.serviceWorker.register("/sw.js");
+  }
+}, []);
+```
+
+### Step 3.7: Frontend — Push Permission Request
+
+Create a hook `use-push-notifications.ts`:
+```ts
+export function usePushNotifications() {
+  const subscribe = async () => {
+    if (!("serviceWorker" in navigator) || !("PushManager" in window)) return;
+    const permission = await Notification.requestPermission();
+    if (permission !== "granted") return;
+
+    const reg = await navigator.serviceWorker.ready;
+    const vapidKey = import.meta.env.VITE_VAPID_PUBLIC_KEY;
+    const sub = await reg.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: vapidKey,
+    });
+
+    await fetch("/api/push/subscribe", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify(sub),
+    });
+  };
+  return { subscribe };
+}
+```
+
+Add a "Enable push notifications" button to the user settings page. Call `subscribe()` on click.
+
+### Step 3.8: Biometric Login (WebAuthn)
+
+#### Add `webauthn_credentials` Table
+
+```ts
+export const webauthnCredentials = pgTable("webauthn_credentials", {
+  id: text("id").primaryKey(),  // credential ID from WebAuthn
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  publicKey: text("public_key").notNull(),  // base64-encoded
+  counter: varchar("counter", { length: 20 }).notNull().default("0"),
+  transports: text("transports"),  // JSON array
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [
+  index("idx_webauthn_user").on(t.userId),
+]);
+```
+
+Run `pnpm --filter @workspace/db run push`.
+
+#### Install `simplewebauthn` on Both Backend and Frontend
+
+```bash
+pnpm add -w @simplewebauthn/server
+pnpm --filter @workspace/pulsepass add @simplewebauthn/browser
+```
+
+#### Add WebAuthn Endpoints to `api.ts`
+
+```ts
+import { generateRegistrationOptions, verifyRegistrationResponse, generateAuthenticationOptions, verifyAuthenticationResponse } from "@simplewebauthn/server";
+
+const rpName = "Campus Flow";
+const rpID = "your-site.netlify.app";  // CHANGE THIS to your actual domain
+const origin = `https://${rpID}`;
+
+// Register a new credential
+if (path === "/webauthn/register/options" && method === "POST") {
+  if (!payload) return json({ error: "Not authenticated" }, 401);
+  const existing = await db.select().from(webauthnCredentials).where(eq(webauthnCredentials.userId, payload.userId));
+  const options = await generateRegistrationOptions({
+    rpName,
+    rpID,
+    userID: payload.userId,
+    userName: payload.email,
+    excludeCredentials: existing.map(c => ({ id: c.id, transports: c.transports ? JSON.parse(c.transports) : undefined })),
+    authenticatorSelection: { userVerification: "preferred", residentKey: "preferred" },
+  });
+  // Store challenge in a transient way (for simplicity, in the response; client echoes it back)
+  return json({ ...options, challenge: options.challenge });
+}
+
+if (path === "/webauthn/register/verify" && method === "POST") {
+  if (!payload) return json({ error: "Not authenticated" }, 401);
+  const { credential, challenge } = await req.json();
+  const verification = await verifyRegistrationResponse({
+    response: credential,
+    expectedChallenge: challenge,
+    expectedOrigin: origin,
+    expectedRPID: rpID,
+  });
+  if (verification.verified && verification.registrationInfo) {
+    const { credential: cred, credentialDeviceType } = verification.registrationInfo;
+    await db.insert(webauthnCredentials).values({
+      id: cred.id,
+      userId: payload.userId,
+      publicKey: Buffer.from(cred.publicKey).toString("base64"),
+      counter: String(cred.counter),
+      transports: credential.response.transports ? JSON.stringify(credential.response.transports) : null,
+    });
+    return json({ verified: true });
+  }
+  return json({ verified: false }, 400);
+}
+
+// Login with biometric
+if (path === "/webauthn/login/options" && method === "POST") {
+  const { email } = await req.json();
+  if (!email) return json({ error: "Email required" }, 400);
+  const [user] = await db.select().from(users).where(eq(users.email, email.toLowerCase().trim())).limit(1);
+  if (!user) return json({ error: "User not found" }, 404);
+  const creds = await db.select().from(webauthnCredentials).where(eq(webauthnCredentials.userId, user.id));
+  if (!creds.length) return json({ error: "No biometric registered" }, 404);
+  const options = await generateAuthenticationOptions({
+    rpID,
+    allowCredentials: creds.map(c => ({ id: c.id, transports: c.transports ? JSON.parse(c.transports) : undefined })),
+    userVerification: "preferred",
+  });
+  return json({ ...options, userId: user.id, challenge: options.challenge });
+}
+
+if (path === "/webauthn/login/verify" && method === "POST") {
+  const { credential, challenge, userId } = await req.json();
+  const [user] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+  if (!user) return json({ error: "User not found" }, 404);
+  const creds = await db.select().from(webauthnCredentials).where(eq(webauthnCredentials.userId, userId));
+  const cred = creds.find(c => c.id === credential.id);
+  if (!cred) return json({ error: "Credential not found" }, 404);
+
+  const verification = await verifyAuthenticationResponse({
+    response: credential,
+    expectedChallenge: challenge,
+    expectedOrigin: origin,
+    expectedRPID: rpID,
+    authenticator: {
+      credentialID: cred.id,
+      credentialPublicKey: Buffer.from(cred.publicKey, "base64"),
+      counter: Number(cred.counter),
+    },
+  });
+
+  if (verification.verified) {
+    await db.update(webauthnCredentials).set({ counter: String(verification.authenticationInfo.newCounter) }).where(eq(webauthnCredentials.id, cred.id));
+    const token = signToken({ userId: user.id, role: user.role, name: user.name, hostel: user.hostel });
+    return json({ verified: true, token }, 200, {
+      "Set-Cookie": cookieHeader("pulsepass_token", token, 30 * 24 * 3600),
+    });
+  }
+  return json({ verified: false }, 400);
+}
+```
+
+#### Frontend — Biometric Login UI
+
+In the login page, add a "Sign in with biometrics" button:
+```tsx
+import { startAuthentication } from "@simplewebauthn/browser";
+
+const handleBiometric = async () => {
+  const email = prompt("Enter your email:");
+  if (!email) return;
+
+  const optionsRes = await fetch("/api/webauthn/login/options", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email }),
+  });
+  const options = await optionsRes.json();
+
+  const credential = await startAuthentication({ optionsJSON: options });
+
+  const verifyRes = await fetch("/api/webauthn/login/verify", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify({ credential, challenge: options.challenge, userId: options.userId }),
+  });
+  const result = await verifyRes.json();
+  if (result.verified) {
+    window.location.href = "/";
+  }
+};
+```
+
+In the user settings page, add a "Register biometrics" button that calls the registration endpoints.
+
+### Step 3.9: Configure Netlify
+
+1. Set environment variables in Netlify dashboard (Site settings → Environment variables):
+   - `VAPID_PUBLIC_KEY`
+   - `VAPID_PRIVATE_KEY`
+   - `VAPID_SUBJECT` (e.g., `mailto:admin@your-domain.com`)
+2. Make sure your custom domain (if any) uses HTTPS — required for WebAuthn and service workers.
+3. Update the `rpID` in `api.ts` to match your actual domain (e.g., `pulsepass.netlify.app` or your custom domain).
+
+### Step 3.10: Deploy Phase 3
+
+```bash
+cp lib/db/src/schema/index.ts netlify/functions/_db/schema.ts
+git add .
+git commit -m "Phase 3: Push notifications and biometric login"
+git push
+```
+
+---
+
+## Testing Checklist
+
+### Phase 1
+- [ ] Admin can create a porter
+- [ ] Porter can log in
+- [ ] Student can sign up with room
+- [ ] Approved exeat → porter scan → status becomes `hostel_checked_out`
+- [ ] Security scan on `approved` exeat shows "not checked out of hostel"
+- [ ] Security scan on `hostel_checked_out` exeat works
+- [ ] Porter scan on `returned` exeat works
+- [ ] Admin can see the full timeline
+
+### Phase 2
+- [ ] Bell shows unread count
+- [ ] Notifications appear for all status changes
+- [ ] Mark as read works
+
+### Phase 3
+- [ ] Browser asks for notification permission
+- [ ] Push notifications arrive even when tab is closed
+- [ ] Biometric registration works (test on phone or laptop with fingerprint)
+- [ ] Biometric login works
+
+---
+
+## Notes
+
+- **After every schema change**: run `cp lib/db/src/schema/index.ts netlify/functions/_db/schema.ts`
+- **For local testing**: add the same env vars to a `.env` file (and add `.env` to `.gitignore`)
+- **For debugging push notifications**: check browser DevTools → Application → Service Workers → Push
+- **For debugging WebAuthn**: use Chrome DevTools → Application → WebAuthn (virtual authenticator)
+
+---
+
+# END OF PROMPT
+
+That's the full implementation spec. **Give this to Replit** and they can build it phase by phase. After each phase, you should test it end-to-end before moving to the next.
+
+Want me to also write the **actual frontend code** for specific pages (e.g., the porter dashboard, the notification bell, the biometric registration flow)? Or do you want to handle that with Replit using this as the spec?

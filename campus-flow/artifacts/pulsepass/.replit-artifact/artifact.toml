@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/"
+title = "PulsePass"
+version = "1.0.0"
+id = "artifacts/pulsepass"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 18413
+
+[services.development]
+run = "pnpm --filter @workspace/pulsepass run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/pulsepass", "run", "build" ]
+publicDir = "artifacts/pulsepass/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "18413"
+BASE_PATH = "/"

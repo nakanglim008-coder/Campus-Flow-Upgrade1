@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
+    <title>PulsePass — Smart Campus Movement System</title>
+    <meta name="description" content="PulsePass digitises every step of the student exeat process — from request to gate scan. No paper. No delays. Instant approvals." />
+    <meta name="robots" content="index, follow" />
+    <meta name="theme-color" content="#0d2012" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="PulsePass" />
+    <meta property="og:title" content="PulsePass — Smart Campus Movement System" />
+    <meta property="og:description" content="Digital exeat management for modern campuses. Students apply, admins approve, security scans — all paperless." />
+    <meta property="og:type" content="website" />
+    <meta property="og:image" content="/logo.png" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="PulsePass" />
+    <meta name="twitter:description" content="Smart digital exeat/campus movement system." />
+    <link rel="icon" type="image/png" href="/logo.png" />
+    <link rel="apple-touch-icon" href="/logo.png" />
+    <link rel="manifest" href="/manifest.json" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
+  </head>
+  <body>
+    <!-- Suppress browser-extension errors (MetaMask etc.) before any scripts load -->
+    <script>
+      window.addEventListener('unhandledrejection', function(e) {
+        var msg = (e.reason && e.reason.message) ? e.reason.message : String(e.reason || '');
+        if (msg.indexOf('MetaMask') !== -1 || msg.indexOf('ethereum') !== -1 ||
+            msg.indexOf('chrome-extension') !== -1 || msg.indexOf('wallet') !== -1) {
+          e.preventDefault(); e.stopImmediatePropagation();
+        }
+      }, true);
+    </script>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

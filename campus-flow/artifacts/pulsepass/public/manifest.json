@@ -1,0 +1,26 @@
+{
+  "name": "PulsePass",
+  "short_name": "PulsePass",
+  "description": "Smart campus movement & exeat management system",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0d2012",
+  "theme_color": "#0d2012",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "/logo.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/logo.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["education", "productivity"],
+  "screenshots": []
+}
