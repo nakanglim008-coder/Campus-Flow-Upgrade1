@@ -11,6 +11,7 @@ import History from "./pages/student/History";
 import Settings from "./pages/student/Settings";
 import Admin from "./pages/admin/Admin";
 import AdminPorters from "./pages/admin/AdminPorters";
+import AdminInvites from "./pages/admin/AdminInvites";
 import Security from "./pages/security/Security";
 import PorterLogin from "./pages/porter/PorterLogin";
 import PorterDashboard from "./pages/porter/PorterDashboard";
@@ -80,6 +81,9 @@ function Routes() {
         <Route path="/invite/security/:token">
           {() => <InviteSignup role="security" />}
         </Route>
+        <Route path="/invite/porter/:token">
+          {() => <InviteSignup role="porter" />}
+        </Route>
         <Route path="/student">
           <StudentGuard><Overview /></StudentGuard>
         </Route>
@@ -97,6 +101,9 @@ function Routes() {
         </Route>
         <Route path="/admin/porters">
           <AdminGuard><AdminPorters /></AdminGuard>
+        </Route>
+        <Route path="/admin/invites">
+          <AdminGuard><AdminInvites /></AdminGuard>
         </Route>
         <Route path="/security">
           <SecurityGuard><Security /></SecurityGuard>

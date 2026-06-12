@@ -3,7 +3,7 @@ import { useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "../../lib/auth";
 import { api, type ExeatDTO, type ExeatDetails } from "../../lib/api";
-import { Clock, CheckCircle2, XCircle, ClipboardCheck, LogOut, FileText, BarChart3, Building2, X, ChevronRight } from "lucide-react";
+import { Clock, CheckCircle2, XCircle, ClipboardCheck, LogOut, FileText, BarChart3, Building2, X, ChevronRight, Link2 } from "lucide-react";
 import Logo from "../../components/Logo";
 import NotificationBell from "../../components/NotificationBell";
 
@@ -94,6 +94,11 @@ export default function Admin() {
             onClick={() => nav("/admin/porters")}
             className="flex items-center gap-1.5 text-xs text-[oklch(0.78_0.18_45)] hover:underline font-medium">
             <Building2 className="w-3.5 h-3.5" /> Porters
+          </motion.button>
+          <motion.button whileHover={{ scale: 1.05 }}
+            onClick={() => nav("/admin/invites")}
+            className="flex items-center gap-1.5 text-xs text-[oklch(0.72_0.18_150)] hover:underline font-medium">
+            <Link2 className="w-3.5 h-3.5" /> Invites
           </motion.button>
           <motion.button whileHover={{ scale: 1.05 }} onClick={logout}
             className="flex items-center gap-1.5 text-sm text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] p-1.5 rounded-lg hover:bg-[var(--color-secondary)]">

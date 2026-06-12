@@ -74,6 +74,17 @@ export type Porter = {
   createdAt: string;
 };
 
+export type InviteDTO = {
+  id: string;
+  token: string;
+  role: "security" | "porter" | "admin";
+  note: string | null;
+  url: string;
+  expiresAt: string;
+  usedAt: string | null;
+  createdAt: string;
+};
+
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
     ...init,
@@ -176,5 +187,14 @@ export const api = {
         method: "POST",
         body: JSON.stringify({ credential, challenge, userId }),
       }),
+  },
+  invites: {
+    list: () => request<InviteDTO[]>("/admin/invites"),
+    create: (data: { role: string; note?: string; expiresHours?: number }) =>
+      request<InviteDTO>("/admin/invites", { method: "POST", body: JSON.stringify(data) }),
+    revoke: (id: string) =>
+      request<{ ok: boolean }>(`/admin/invites/${id}`, { method: "DELETE" }),
+    validate: (token: string) =>
+      request<{ valid: boolean; role?: string; note?: string }>(`/invite/validate/${token}`),
   },
 };

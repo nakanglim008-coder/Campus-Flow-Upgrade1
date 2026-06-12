@@ -108,8 +108,24 @@ export const webauthnCredentials = pgTable("webauthn_credentials", {
   index("idx_webauthn_user").on(t.userId),
 ]);
 
+export const inviteLinks = pgTable("invite_links", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  token: text("token").notNull().unique(),
+  role: roleEnum("role").notNull(),
+  note: varchar("note", { length: 200 }),
+  createdBy: uuid("created_by").notNull().references(() => users.id, { onDelete: "cascade" }),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  usedAt: timestamp("used_at", { withTimezone: true }),
+  usedBy: uuid("used_by").references(() => users.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [
+  index("idx_invite_token").on(t.token),
+  index("idx_invite_created_by").on(t.createdBy),
+]);
+
 export type User = typeof users.$inferSelect;
 export type ExeatRequest = typeof exeatRequests.$inferSelect;
 export type Notification = typeof notifications.$inferSelect;
 export type PushSubscription = typeof pushSubscriptions.$inferSelect;
 export type WebauthnCredential = typeof webauthnCredentials.$inferSelect;
+export type InviteLink = typeof inviteLinks.$inferSelect;

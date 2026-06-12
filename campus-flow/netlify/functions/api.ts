@@ -1,12 +1,12 @@
 import type { Context } from "@netlify/functions";
 import { neon } from "@neondatabase/serverless";
 import { drizzle } from "drizzle-orm/neon-http";
-import { eq, desc, or, and, inArray, isNull } from "drizzle-orm";
+import { eq, desc, or, and, inArray, isNull, gt } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import webpush from "web-push";
 import { generateRegistrationOptions, verifyRegistrationResponse, generateAuthenticationOptions, verifyAuthenticationResponse } from "@simplewebauthn/server";
-import { users, exeatRequests, notifications, pushSubscriptions, webauthnCredentials } from "./_db/schema";
+import { users, exeatRequests, notifications, pushSubscriptions, webauthnCredentials, inviteLinks } from "./_db/schema";
 
 type Role = "student" | "admin" | "security" | "porter";
 type JwtPayload = { userId: string; role: Role; name: string; hostel: string | null };
@@ -14,8 +14,17 @@ type JwtPayload = { userId: string; role: Role; name: string; hostel: string | n
 function getDb() {
   const url = process.env.DATABASE_URL!;
   return drizzle(neon(url), {
-    schema: { users, exeatRequests, notifications, pushSubscriptions, webauthnCredentials },
+    schema: { users, exeatRequests, notifications, pushSubscriptions, webauthnCredentials, inviteLinks },
   });
+}
+
+function makeInviteToken() {
+  return crypto.randomUUID().replace(/-/g, "");
+}
+
+function buildInviteUrl(req: Request, token: string, role: string) {
+  const origin = new URL(req.url).origin;
+  return `${origin}/invite/${role}/${token}`;
 }
 
 function getSecret() {
@@ -125,12 +134,49 @@ export default async function handler(req: Request, ctx: Context) {
 
   try {
     // Auth routes
+    // Public invite validate (no auth needed)
+    if (path.startsWith("/invite/validate/") && method === "GET") {
+      const token = path.split("/")[3];
+      if (!token) return json({ valid: false }, 200);
+      const db = getDb();
+      const [link] = await db.select().from(inviteLinks).where(eq(inviteLinks.token, token)).limit(1);
+      if (!link) return json({ valid: false }, 200);
+      if (link.usedAt) return json({ valid: false, reason: "already_used" }, 200);
+      if (link.expiresAt < new Date()) return json({ valid: false, reason: "expired" }, 200);
+      return json({ valid: true, role: link.role, note: link.note });
+    }
+
     if (path === "/auth/signup" && method === "POST") {
       const body = await req.json();
       const { email, password, name, role, inviteToken, matric, hostel, room } = body;
       if (!email || !password || !name || !role) return json({ error: "Missing fields" }, 400);
-      if (role === "admin" && inviteToken !== process.env.ADMIN_INVITE_TOKEN) return json({ error: "Invalid admin invite token" }, 403);
-      if (role === "security" && inviteToken !== process.env.SECURITY_INVITE_TOKEN) return json({ error: "Invalid security invite token" }, 403);
+
+      // Admin: allow env-var bootstrap OR DB invite
+      if (role === "admin") {
+        const envToken = process.env.ADMIN_INVITE_TOKEN;
+        if (envToken && inviteToken === envToken) {
+          // env-var bootstrap OK
+        } else if (inviteToken) {
+          const db2 = getDb();
+          const [link] = await db2.select().from(inviteLinks).where(eq(inviteLinks.token, inviteToken)).limit(1);
+          if (!link || link.role !== "admin" || link.usedAt || link.expiresAt < new Date()) {
+            return json({ error: "Invalid or expired invite link" }, 403);
+          }
+        } else {
+          return json({ error: "Admin accounts require an invite link" }, 403);
+        }
+      }
+
+      // Security and porter: must use DB invite
+      if (role === "security" || role === "porter") {
+        if (!inviteToken) return json({ error: "An invite link is required for this role" }, 403);
+        const db2 = getDb();
+        const [link] = await db2.select().from(inviteLinks).where(eq(inviteLinks.token, inviteToken)).limit(1);
+        if (!link || link.role !== role || link.usedAt || link.expiresAt < new Date()) {
+          return json({ error: "Invalid or expired invite link" }, 403);
+        }
+      }
+
       if (role === "student" && (!matric || !hostel)) return json({ error: "Matric and hostel required" }, 400);
 
       const db = getDb();
@@ -149,9 +195,18 @@ export default async function handler(req: Request, ctx: Context) {
         room: role === "student" ? (room || null) : null,
       }).returning();
 
+      // Mark invite as used for non-student roles (when using a DB invite)
+      if ((role === "security" || role === "porter") && inviteToken) {
+        await db.update(inviteLinks).set({ usedAt: new Date(), usedBy: user.id }).where(eq(inviteLinks.token, inviteToken));
+      }
+      if (role === "admin" && inviteToken && inviteToken !== process.env.ADMIN_INVITE_TOKEN) {
+        await db.update(inviteLinks).set({ usedAt: new Date(), usedBy: user.id }).where(eq(inviteLinks.token, inviteToken));
+      }
+
       const admins = await db.select({ id: users.id }).from(users).where(eq(users.role, "admin"));
       for (const admin of admins) {
-        await notify(db, admin.id, "new_signup", "New student registered", `${user.name} (${user.matric}) has registered.`);
+        if (admin.id === user.id) continue;
+        await notify(db, admin.id, "new_signup", "New account registered", `${user.name} registered as ${user.role}.`);
       }
 
       const token = signToken({ userId: user.id, role: user.role, name: user.name, hostel: user.hostel ?? null });
@@ -593,6 +648,56 @@ export default async function handler(req: Request, ctx: Context) {
         return json({ verified: true });
       }
       return json({ verified: false }, 400);
+    }
+
+    // --- INVITE LINK ROUTES (admin only) ---
+
+    if (path === "/admin/invites" && method === "GET") {
+      if (payload.role !== "admin") return json({ error: "Forbidden" }, 403);
+      const links = await db.select().from(inviteLinks).orderBy(desc(inviteLinks.createdAt)).limit(100);
+      return json(links.map(l => ({
+        id: l.id,
+        token: l.token,
+        role: l.role,
+        note: l.note,
+        url: buildInviteUrl(req, l.token, l.role),
+        expiresAt: l.expiresAt.toISOString(),
+        usedAt: l.usedAt?.toISOString() ?? null,
+        createdAt: l.createdAt.toISOString(),
+      })));
+    }
+
+    if (path === "/admin/invites" && method === "POST") {
+      if (payload.role !== "admin") return json({ error: "Forbidden" }, 403);
+      const body = await req.json();
+      const { role: invRole, note, expiresHours = 48 } = body;
+      if (!invRole || !["admin", "security", "porter"].includes(invRole)) return json({ error: "Invalid role" }, 400);
+      const token = makeInviteToken();
+      const expiresAt = new Date(Date.now() + Number(expiresHours) * 60 * 60 * 1000);
+      const [link] = await db.insert(inviteLinks).values({
+        token,
+        role: invRole,
+        note: note || null,
+        createdBy: payload.userId,
+        expiresAt,
+      }).returning();
+      return json({
+        id: link.id,
+        token: link.token,
+        role: link.role,
+        note: link.note,
+        url: buildInviteUrl(req, link.token, link.role),
+        expiresAt: link.expiresAt.toISOString(),
+        usedAt: null,
+        createdAt: link.createdAt.toISOString(),
+      }, 201);
+    }
+
+    if (path.startsWith("/admin/invites/") && method === "DELETE") {
+      if (payload.role !== "admin") return json({ error: "Forbidden" }, 403);
+      const inviteId = path.split("/")[3];
+      await db.delete(inviteLinks).where(and(eq(inviteLinks.id, inviteId), eq(inviteLinks.createdBy, payload.userId)));
+      return json({ ok: true });
     }
 
     return json({ error: "Not found" }, 404);

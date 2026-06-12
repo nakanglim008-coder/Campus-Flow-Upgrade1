@@ -6,7 +6,7 @@ import { api } from "../lib/api";
 import { ShieldCheck, Eye, EyeOff, Lock } from "lucide-react";
 import Logo from "../components/Logo";
 
-type Props = { role: "admin" | "security" };
+type Props = { role: "admin" | "security" | "porter" };
 
 export default function InviteSignup({ role }: Props) {
   const params = useParams<{ token: string }>();
@@ -32,7 +32,8 @@ export default function InviteSignup({ role }: Props) {
       await api.auth.signup({ email: form.email, password: form.password, name: form.name, role, inviteToken: token });
       await refresh();
       setSuccess(true);
-      setTimeout(() => nav(role === "admin" ? "/admin" : "/security"), 1400);
+      const dest = role === "admin" ? "/admin" : role === "security" ? "/security" : "/porter";
+      setTimeout(() => nav(dest), 1400);
     } catch (err: unknown) {
       setError((err as Error).message ?? "Signup failed");
     } finally {
@@ -40,8 +41,8 @@ export default function InviteSignup({ role }: Props) {
     }
   }
 
-  const label = role === "admin" ? "Admin" : "Security Officer";
-  const color = role === "admin" ? "oklch(0.72 0.18 250)" : "oklch(0.78 0.16 35)";
+  const label = role === "admin" ? "Admin" : role === "security" ? "Security Officer" : "Porter";
+  const color = role === "admin" ? "oklch(0.72 0.18 250)" : role === "security" ? "oklch(0.78 0.16 35)" : "oklch(0.78 0.18 45)";
   const Icon = role === "admin" ? ShieldCheck : Lock;
 
   return (
