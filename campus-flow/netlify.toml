@@ -1,9 +1,10 @@
 [build]
-  publish = "artifacts/pulsepass/dist/public"
-  command = "pnpm install && pnpm --filter @workspace/pulsepass run build && pnpm exec esbuild netlify/functions/api.ts --bundle --format=esm --platform=node --target=es2022 --packages=bundle --outfile=netlify/functions/api-bundled.mjs"
+  base = "campus-flow"
+  publish = "campus-flow/artifacts/pulsepass/dist/public"
+  command = "cd campus-flow && pnpm install && pnpm --filter @workspace/pulsepass run build && pnpm exec esbuild netlify/functions/api.ts --bundle --format=esm --platform=node --target=es2022 --packages=bundle --outfile=netlify/functions/api-bundled.mjs"
 
 [functions]
-  directory = "netlify/functions"
+  directory = "campus-flow/netlify/functions"
   node_bundler = "esbuild"
 
 [[redirects]]
