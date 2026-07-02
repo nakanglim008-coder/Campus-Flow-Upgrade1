@@ -1,0 +1,267 @@
+🚀 Project Concept
+
+“PulsePass”
+
+A Smart Digital Exeat & Campus Movement System
+
+(You can still keep it under ClassPulse as a module.)
+
+⸻
+
+🎯 THE CORE PROBLEM
+
+At many universities, exeat systems are:
+
+* manual
+* slow
+* paper-based
+* stressful
+* difficult to track
+
+Students:
+
+* wait too long for approval
+* don’t know approval status
+* lose physical slips
+* struggle with emergency movement
+
+School/Admin:
+
+* cannot efficiently monitor movement
+* face record-keeping problems
+* experience security gaps
+
+⸻
+
+💡 THE SOLUTION
+
+A centralized digital platform where students:
+
+* request exeat online
+* state reason
+* upload supporting documents if needed
+* track approval status in real time
+* receive digital QR verification
+
+And administrators:
+
+* approve/reject requests
+* track movement history
+* monitor student exits/returns
+* improve campus accountability
+
+⸻
+
+🔥 WHY THIS IDEA IS STRONG
+
+This is NOT just “an app.”
+
+It combines:
+
+* education technology
+* campus security
+* administrative innovation
+* student convenience
+
+That sounds VERY advanced in presentations.
+
+⸻
+
+🧩 HOW THE SYSTEM WORKS
+
+STEP 1 — Student Login
+
+Student logs in with:
+
+* matric number
+* student ID
+
+⸻
+
+STEP 2 — Request Exeat
+
+Student fills:
+
+* destination
+* reason
+* departure date
+* return date
+
+Optional:
+
+* upload medical note
+* parent approval
+* event proof
+
+⸻
+
+STEP 3 — Review Process
+
+Request goes to:
+
+* hostel admin
+* student affairs
+* authorized personnel
+
+Status:
+
+* Pending
+* Approved
+* Rejected
+
+⸻
+
+STEP 4 — QR Code Generation
+
+Once approved:
+
+Student receives:
+
+* digital pass
+* QR verification code
+
+This is the coolest part visually.
+
+⸻
+
+STEP 5 — Gate Verification
+
+Security scans QR code.
+
+System confirms:
+
+* identity
+* approval validity
+* return deadline
+
+⸻
+
+STEP 6 — Check-In / Return
+
+Upon return:
+
+* QR scanned again
+* system marks student as returned
+
+This creates:
+
+* movement records
+* accountability
+* safety tracking
+
+⸻
+
+🎨 PROTOTYPE SCREENS YOU SHOULD CREATE
+
+This is VERY important.
+
+Student Side
+
+* Login page
+* Request exeat form
+* Approval tracker
+* QR pass screen
+* Movement history
+
+⸻
+
+Admin Side
+
+* Pending requests dashboard
+* Approval/rejection buttons
+* Student movement analytics
+
+⸻
+
+Security Side
+
+* QR scanner screen
+* Verification result page
+
+⸻
+
+🔥 FEATURES THAT WILL IMPRESS LECTURERS
+
+⭐ Emergency Exeat Option
+
+For:
+
+* health emergencies
+* family emergencies
+
+Fast-track approval.
+
+⸻
+
+⭐ Notification System
+
+Students receive:
+
+* approval alerts
+* rejection reasons
+* return reminders
+
+⸻
+
+⭐ Movement Analytics
+
+School can monitor:
+
+* peak movement periods
+* hostel activity
+* security patterns
+
+This makes your system look INTELLIGENT.
+
+⸻
+
+🧠 DESIGN THINKING CONNECTION
+
+Empathize
+
+Interview:
+
+* students
+* hostel staff
+* security personnel
+
+Ask:
+
+* “What frustrates you about exeat?”
+* “What delays happen often?”
+
+⸻
+
+Define
+
+“Students and administrators experience inefficiencies and stress due to manual exeat and movement tracking systems.”
+
+⸻
+
+Ideate
+
+Possible ideas:
+
+* digital forms
+* QR verification
+* automated approvals
+* notification systems
+
+⸻
+
+Prototype
+
+Build:
+
+* UI screens
+* workflow diagrams
+* QR sample
+
+⸻
+
+Test
+
+Ask users:
+
+* “Would this reduce stress?”
+* “Would this improve security?”
