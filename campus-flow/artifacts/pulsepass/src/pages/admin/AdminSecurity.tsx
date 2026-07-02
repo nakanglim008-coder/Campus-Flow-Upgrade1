@@ -2,17 +2,17 @@ import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "../../lib/auth";
-import { api, type Porter } from "../../lib/api";
-import { Building2, Trash2, UserPlus, ArrowLeft, Eye, EyeOff } from "lucide-react";
+import { api, type SecurityOfficer } from "../../lib/api";
+import { ShieldCheck, Trash2, UserPlus, ArrowLeft, Eye, EyeOff } from "lucide-react";
 import Logo from "../../components/Logo";
 import ThemeToggle from "../../components/ThemeToggle";
 
-export default function AdminPorters() {
+export default function AdminSecurity() {
   const { user, logout } = useAuth();
   const [, nav] = useLocation();
-  const [porters, setPorters] = useState<Porter[]>([]);
+  const [officers, setOfficers] = useState<SecurityOfficer[]>([]);
   const [loading, setLoading] = useState(true);
-  const [form, setForm] = useState({ email: "", password: "", name: "", hostel: "" });
+  const [form, setForm] = useState({ email: "", password: "", name: "" });
   const [showPass, setShowPass] = useState(false);
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState("");
@@ -26,11 +26,11 @@ export default function AdminPorters() {
 
   async function load() {
     setLoading(true);
-    api.porters.list().then(setPorters).finally(() => setLoading(false));
+    api.security.list().then(setOfficers).finally(() => setLoading(false));
   }
 
   function setF(k: keyof typeof form) {
-    return (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
+    return (e: React.ChangeEvent<HTMLInputElement>) =>
       setForm(f => ({ ...f, [k]: e.target.value }));
   }
 
@@ -39,11 +39,11 @@ export default function AdminPorters() {
     setCreateError("");
     setCreating(true);
     try {
-      await api.porters.create(form);
-      setForm({ email: "", password: "", name: "", hostel: "" });
+      await api.security.create(form);
+      setForm({ email: "", password: "", name: "" });
       await load();
     } catch (err: unknown) {
-      setCreateError((err as Error).message ?? "Failed to create porter");
+      setCreateError((err as Error).message ?? "Failed to create security officer");
     } finally {
       setCreating(false);
     }
@@ -52,8 +52,8 @@ export default function AdminPorters() {
   async function handleDelete(id: string) {
     setDeletingId(id);
     try {
-      await api.porters.delete(id);
-      setPorters(ps => ps.filter(p => p.id !== id));
+      await api.security.delete(id);
+      setOfficers(os => os.filter(o => o.id !== id));
     } catch {}
     setDeletingId(null);
   }
@@ -86,27 +86,27 @@ export default function AdminPorters() {
 
         <motion.div initial={{ opacity: 0, y: -12 }} animate={{ opacity: 1, y: 0 }}>
           <h1 className="text-2xl font-bold text-gradient flex items-center gap-2">
-            <Building2 className="w-6 h-6 text-[oklch(0.78_0.18_45)]" />
-            Porter Management
+            <ShieldCheck className="w-6 h-6 text-[oklch(0.78_0.16_35)]" />
+            Security Management
           </h1>
-          <p className="text-sm text-[var(--color-muted-foreground)] mt-1">Create and manage hostel porters</p>
+          <p className="text-sm text-[var(--color-muted-foreground)] mt-1">Create and manage security officers</p>
         </motion.div>
 
         <motion.form initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}
           onSubmit={handleCreate} className="glass-card rounded-2xl p-5 space-y-4">
           <h2 className="font-semibold text-sm flex items-center gap-2">
-            <UserPlus className="w-4 h-4 text-[oklch(0.78_0.18_45)]" /> Create New Porter
+            <UserPlus className="w-4 h-4 text-[oklch(0.78_0.16_35)]" /> Create New Security Officer
           </h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-medium text-[var(--color-muted-foreground)] mb-1.5">Full Name</label>
-              <input value={form.name} onChange={setF("name")} required className="input-base" placeholder="Porter name" />
+              <input value={form.name} onChange={setF("name")} required className="input-base" placeholder="Officer name" />
             </div>
             <div>
               <label className="block text-xs font-medium text-[var(--color-muted-foreground)] mb-1.5">Email</label>
-              <input type="email" value={form.email} onChange={setF("email")} required className="input-base" placeholder="porter@school.edu.ng" />
+              <input type="email" value={form.email} onChange={setF("email")} required className="input-base" placeholder="security@school.edu.ng" />
             </div>
-            <div>
+            <div className="sm:col-span-2">
               <label className="block text-xs font-medium text-[var(--color-muted-foreground)] mb-1.5">Password</label>
               <div className="relative">
                 <input
@@ -124,17 +124,6 @@ export default function AdminPorters() {
                 </button>
               </div>
             </div>
-            <div>
-              <label className="block text-xs font-medium text-[var(--color-muted-foreground)] mb-1.5">Assigned Hostel</label>
-              <input 
-                type="text"
-                value={form.hostel} 
-                onChange={setF("hostel")} 
-                required
-                className="input-base"
-                placeholder="Enter hostel name"
-              />
-            </div>
           </div>
 
           <AnimatePresence>
@@ -149,19 +138,19 @@ export default function AdminPorters() {
           <motion.button type="submit" disabled={creating}
             whileHover={!creating ? { scale: 1.01 } : {}} whileTap={!creating ? { scale: 0.99 } : {}}
             className="px-6 py-2.5 rounded-xl text-white font-semibold text-sm disabled:opacity-50 hover:opacity-90"
-            style={{ background: "oklch(0.72 0.18 45)" }}>
+            style={{ background: "oklch(0.78 0.16 35)" }}>
             {creating ? (
               <span className="flex items-center gap-2">
                 <span className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
                 Creating…
               </span>
-            ) : "Create Porter"}
+            ) : "Create Security Officer"}
           </motion.button>
         </motion.form>
 
         <div className="space-y-3">
           <h2 className="font-semibold text-sm text-[var(--color-muted-foreground)]">
-            {porters.length} porter{porters.length !== 1 ? "s" : ""} registered
+            {officers.length} security officer{officers.length !== 1 ? "s" : ""} registered
           </h2>
 
           {loading && (
@@ -170,32 +159,32 @@ export default function AdminPorters() {
             </div>
           )}
 
-          {!loading && porters.length === 0 && (
+          {!loading && officers.length === 0 && (
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="glass-card rounded-2xl p-12 text-center text-[var(--color-muted-foreground)]">
-              <Building2 className="w-9 h-9 mx-auto mb-3 opacity-30" />
-              <p className="text-sm">No porters created yet</p>
+              <ShieldCheck className="w-9 h-9 mx-auto mb-3 opacity-30" />
+              <p className="text-sm">No security officers created yet</p>
             </motion.div>
           )}
 
           <motion.div variants={{ hidden: {}, show: { transition: { staggerChildren: 0.06 } } }} initial="hidden" animate="show" className="space-y-3">
-            {porters.map(p => (
-              <motion.div key={p.id}
+            {officers.map(o => (
+              <motion.div key={o.id}
                 variants={{ hidden: { opacity: 0, y: 10 }, show: { opacity: 1, y: 0 } }}
                 className="glass-card rounded-2xl p-4 flex items-center justify-between gap-3">
                 <div className="flex items-center gap-3 min-w-0">
-                  <div className="w-9 h-9 rounded-xl flex-shrink-0 flex items-center justify-center" style={{ background: "oklch(0.72_0.18_45_/_0.2)" }}>
-                    <Building2 className="w-4 h-4" style={{ color: "oklch(0.78 0.18 45)" }} />
+                  <div className="w-9 h-9 rounded-xl flex-shrink-0 flex items-center justify-center" style={{ background: "oklch(0.78_0.16_35_/_0.2)" }}>
+                    <ShieldCheck className="w-4 h-4" style={{ color: "oklch(0.78 0.16 35)" }} />
                   </div>
                   <div className="min-w-0">
-                    <p className="font-semibold text-sm truncate">{p.name}</p>
-                    <p className="text-xs text-[var(--color-muted-foreground)] truncate">{p.email} · {p.hostel ?? "No hostel"}</p>
+                    <p className="font-semibold text-sm truncate">{o.name}</p>
+                    <p className="text-xs text-[var(--color-muted-foreground)] truncate">{o.email}</p>
                   </div>
                 </div>
                 <motion.button whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}
-                  onClick={() => handleDelete(p.id)}
-                  disabled={deletingId === p.id}
+                  onClick={() => handleDelete(o.id)}
+                  disabled={deletingId === o.id}
                   className="p-2 rounded-lg text-[var(--color-destructive)] hover:bg-[oklch(0.6_0.22_25_/_0.1)] disabled:opacity-40 flex-shrink-0">
-                  {deletingId === p.id
+                  {deletingId === o.id
                     ? <span className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin block" />
                     : <Trash2 className="w-4 h-4" />}
                 </motion.button>

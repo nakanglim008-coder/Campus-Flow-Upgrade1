@@ -17,7 +17,7 @@ export default function InviteSignup({ role }: Props) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
-  const [form, setForm] = useState({ email: "", password: "", name: "" });
+  const [form, setForm] = useState({ email: "", password: "", name: "", hostel: "" });
 
   function set(k: keyof typeof form) {
     return (e: React.ChangeEvent<HTMLInputElement>) =>
@@ -29,7 +29,18 @@ export default function InviteSignup({ role }: Props) {
     setError("");
     setLoading(true);
     try {
-      await api.auth.signup({ email: form.email, password: form.password, name: form.name, role, inviteToken: token });
+      const signupData: any = { 
+        email: form.email, 
+        password: form.password, 
+        name: form.name, 
+        role, 
+        inviteToken: token 
+      };
+      // Add hostel for porter role
+      if (role === "porter" && form.hostel) {
+        signupData.hostel = form.hostel;
+      }
+      await api.auth.signup(signupData);
       await refresh();
       setSuccess(true);
       const dest = role === "admin" ? "/admin" : role === "security" ? "/security" : "/porter";
@@ -90,6 +101,18 @@ export default function InviteSignup({ role }: Props) {
                   </button>
                 </div>
               </div>
+              {role === "porter" && (
+                <div>
+                  <label className="block text-xs font-medium text-[var(--color-muted-foreground)] mb-1.5">Assigned Hostel</label>
+                  <input 
+                    value={form.hostel} 
+                    onChange={set("hostel")} 
+                    required 
+                    className="input-base" 
+                    placeholder="Enter hostel name" 
+                  />
+                </div>
+              )}
 
               <AnimatePresence>
                 {error && (

@@ -6,6 +6,7 @@ import { api } from "../../lib/api";
 import { Html5Qrcode } from "html5-qrcode";
 import { Camera, CameraOff, LogOut, ScanLine, Building2 } from "lucide-react";
 import Logo from "../../components/Logo";
+import ThemeToggle from "../../components/ThemeToggle";
 
 type ScanResult = {
   kind: string;
@@ -109,6 +110,7 @@ export default function PorterDashboard() {
               <Building2 className="w-3 h-3" /> {user.hostel}
             </span>
           )}
+          <ThemeToggle />
           <motion.button whileHover={{ scale: 1.05 }} onClick={logout}
             className="flex items-center gap-1.5 text-sm text-[var(--color-muted-foreground)] p-1.5 rounded-lg hover:bg-[var(--color-secondary)]">
             <LogOut className="w-4 h-4" />

@@ -11,6 +11,7 @@ import History from "./pages/student/History";
 import Settings from "./pages/student/Settings";
 import Admin from "./pages/admin/Admin";
 import AdminPorters from "./pages/admin/AdminPorters";
+import AdminSecurity from "./pages/admin/AdminSecurity";
 import AdminInvites from "./pages/admin/AdminInvites";
 import Security from "./pages/security/Security";
 import PorterLogin from "./pages/porter/PorterLogin";
@@ -98,6 +99,9 @@ function Routes() {
         </Route>
         <Route path="/admin">
           <AdminGuard><Admin /></AdminGuard>
+        </Route>
+        <Route path="/admin/security">
+          <AdminGuard><AdminSecurity /></AdminGuard>
         </Route>
         <Route path="/admin/porters">
           <AdminGuard><AdminPorters /></AdminGuard>

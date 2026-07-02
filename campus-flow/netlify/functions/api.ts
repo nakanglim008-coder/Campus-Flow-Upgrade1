@@ -178,6 +178,7 @@ export default async function handler(req: Request, ctx: Context) {
       }
 
       if (role === "student" && (!matric || !hostel)) return json({ error: "Matric and hostel required" }, 400);
+      if (role === "porter" && !hostel) return json({ error: "Hostel required for porter accounts" }, 400);
 
       const db = getDb();
       const norm = email.toLowerCase().trim();
@@ -191,7 +192,7 @@ export default async function handler(req: Request, ctx: Context) {
         name,
         role,
         matric: role === "student" ? matric : null,
-        hostel: role === "student" ? hostel : null,
+        hostel: (role === "student" || role === "porter") ? hostel : null,
         room: role === "student" ? (room || null) : null,
       }).returning();
 
@@ -523,6 +524,52 @@ export default async function handler(req: Request, ctx: Context) {
       if (payload.role !== "admin") return json({ error: "Forbidden" }, 403);
       const porterId = path.split("/")[2];
       await db.delete(users).where(and(eq(users.id, porterId), eq(users.role, "porter")));
+      return json({ ok: true });
+    }
+
+    // --- SECURITY ROUTES ---
+
+    if (path === "/security/create" && method === "POST") {
+      if (payload.role !== "admin") return json({ error: "Forbidden" }, 403);
+      const body = await req.json();
+      const { email, password, name } = body;
+      if (!email || !password || !name) return json({ error: "Missing fields" }, 400);
+
+      const norm = email.toLowerCase().trim();
+      const existing = await db.select({ id: users.id }).from(users).where(eq(users.email, norm)).limit(1);
+      if (existing.length) return json({ error: "Email already registered" }, 409);
+
+      const passwordHash = await hashPassword(password);
+      const [officer] = await db.insert(users).values({
+        email: norm,
+        passwordHash,
+        name,
+        role: "security",
+      }).returning();
+
+      const admins = await db.select({ id: users.id }).from(users).where(eq(users.role, "admin"));
+      for (const admin of admins) {
+        await notify(db, admin.id, "new_security", "Security Officer Created", `Security officer ${officer.name} has been created.`);
+      }
+
+      return json({ id: officer.id, email: officer.email, name: officer.name, role: officer.role }, 201);
+    }
+
+    if (path === "/security" && method === "GET") {
+      if (payload.role !== "admin") return json({ error: "Forbidden" }, 403);
+      const officers = await db.select({
+        id: users.id,
+        email: users.email,
+        name: users.name,
+        createdAt: users.createdAt,
+      }).from(users).where(eq(users.role, "security")).orderBy(desc(users.createdAt));
+      return json(officers);
+    }
+
+    if (path.startsWith("/security/") && method === "DELETE") {
+      if (payload.role !== "admin") return json({ error: "Forbidden" }, 403);
+      const officerId = path.split("/")[2];
+      await db.delete(users).where(and(eq(users.id, officerId), eq(users.role, "security")));
       return json({ ok: true });
     }
 

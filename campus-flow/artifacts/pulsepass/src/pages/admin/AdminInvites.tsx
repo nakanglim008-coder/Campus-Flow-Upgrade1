@@ -5,6 +5,7 @@ import { useAuth } from "../../lib/auth";
 import { api, type InviteDTO } from "../../lib/api";
 import { Link2, Copy, Check, Trash2, Plus, ArrowLeft, Clock, ShieldCheck, Briefcase, RefreshCw } from "lucide-react";
 import Logo from "../../components/Logo";
+import ThemeToggle from "../../components/ThemeToggle";
 
 const ROLE_CONFIG = {
   security: { label: "Security Officer", color: "oklch(0.78 0.16 35)", icon: ShieldCheck },
@@ -95,6 +96,7 @@ export default function AdminInvites() {
           <span className="hidden sm:block text-xs px-2 py-0.5 rounded-full bg-[oklch(0.72_0.18_250_/_0.2)] text-[oklch(0.72_0.18_250)] font-medium">Admin</span>
         </div>
         <div className="flex items-center gap-3">
+          <ThemeToggle />
           <motion.button whileHover={{ scale: 1.05 }} onClick={() => nav("/admin")}
             className="flex items-center gap-1.5 text-xs text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)]">
             <ArrowLeft className="w-3.5 h-3.5" /> Dashboard

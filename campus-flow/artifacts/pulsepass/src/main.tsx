@@ -1,6 +1,7 @@
 import { createRoot } from "react-dom/client";
 import App from "./App";
 import "./index.css";
+import { ThemeProvider } from "./lib/theme";
 
 // Suppress browser-extension noise (MetaMask etc.) — these are not app errors
 window.addEventListener("unhandledrejection", (event) => {
@@ -17,4 +18,8 @@ window.addEventListener("unhandledrejection", (event) => {
   }
 });
 
-createRoot(document.getElementById("root")!).render(<App />);
+createRoot(document.getElementById("root")!).render(
+  <ThemeProvider>
+    <App />
+  </ThemeProvider>
+);

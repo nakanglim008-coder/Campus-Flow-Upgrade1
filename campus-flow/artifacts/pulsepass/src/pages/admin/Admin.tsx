@@ -3,9 +3,10 @@ import { useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "../../lib/auth";
 import { api, type ExeatDTO, type ExeatDetails } from "../../lib/api";
-import { Clock, CheckCircle2, XCircle, ClipboardCheck, LogOut, FileText, BarChart3, Building2, X, ChevronRight, Link2 } from "lucide-react";
+import { Clock, CheckCircle2, XCircle, ClipboardCheck, LogOut, FileText, BarChart3, Building2, X, ChevronRight, Link2, ShieldCheck } from "lucide-react";
 import Logo from "../../components/Logo";
 import NotificationBell from "../../components/NotificationBell";
+import ThemeToggle from "../../components/ThemeToggle";
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; icon: typeof Clock }> = {
   pending: { label: "Pending", color: "oklch(0.78 0.16 80)", icon: Clock },
@@ -90,6 +91,12 @@ export default function Admin() {
         <div className="flex items-center gap-3">
           <span className="hidden sm:block text-sm text-[var(--color-muted-foreground)]">{user?.name}</span>
           <NotificationBell />
+          <ThemeToggle />
+          <motion.button whileHover={{ scale: 1.05 }}
+            onClick={() => nav("/admin/security")}
+            className="flex items-center gap-1.5 text-xs text-[oklch(0.78_0.16_35)] hover:underline font-medium">
+            <ShieldCheck className="w-3.5 h-3.5" /> Security
+          </motion.button>
           <motion.button whileHover={{ scale: 1.05 }}
             onClick={() => nav("/admin/porters")}
             className="flex items-center gap-1.5 text-xs text-[oklch(0.78_0.18_45)] hover:underline font-medium">

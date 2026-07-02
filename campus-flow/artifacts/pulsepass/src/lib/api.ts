@@ -74,6 +74,13 @@ export type Porter = {
   createdAt: string;
 };
 
+export type SecurityOfficer = {
+  id: string;
+  email: string;
+  name: string;
+  createdAt: string;
+};
+
 export type InviteDTO = {
   id: string;
   token: string;
@@ -137,6 +144,13 @@ export const api = {
         method: "POST",
         body: JSON.stringify({ code }),
       }),
+  },
+  security: {
+    list: () => request<SecurityOfficer[]>("/security"),
+    create: (data: { email: string; password: string; name: string }) =>
+      request<SecurityOfficer>("/security/create", { method: "POST", body: JSON.stringify(data) }),
+    delete: (id: string) =>
+      request<{ ok: boolean }>(`/security/${id}`, { method: "DELETE" }),
   },
   exeats: {
     my: () => request<ExeatDTO[]>("/exeats/my"),

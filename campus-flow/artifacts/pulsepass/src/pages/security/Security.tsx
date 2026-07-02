@@ -7,6 +7,7 @@ import { Html5Qrcode } from "html5-qrcode";
 import { Camera, CameraOff, LogOut, ScanLine, Users, RefreshCw } from "lucide-react";
 import Logo from "../../components/Logo";
 import NotificationBell from "../../components/NotificationBell";
+import ThemeToggle from "../../components/ThemeToggle";
 
 type ScanResult = {
   kind: string;
@@ -36,6 +37,7 @@ export default function Security() {
   const [loadingActive, setLoadingActive] = useState(false);
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const processingRef = useRef(false);
+  const lastScanTimeRef = useRef<number>(0);
 
   useEffect(() => {
     if (!user) { nav("/auth"); return; }
@@ -55,6 +57,7 @@ export default function Security() {
   async function startScanner() {
     setResult(null);
     setScanning(true);
+    processingRef.current = false; // Reset processing flag
     try {
       const qr = new Html5Qrcode("qr-reader");
       scannerRef.current = qr;
@@ -64,8 +67,8 @@ export default function Security() {
         async (code) => {
           if (processingRef.current) return;
           processingRef.current = true;
-          await handleScan(code);
-          await stopScanner();
+          await stopScanner(); // Stop scanner FIRST
+          await handleScan(code); // Then process
         },
         () => {},
       );
@@ -89,11 +92,21 @@ export default function Security() {
 
   async function handleScan(code: string) {
     const trimmed = code.trim().toUpperCase();
+    
+    // Prevent duplicate scans within 30 seconds
+    const now = Date.now();
+    if (now - lastScanTimeRef.current < 30000) {
+      return;
+    }
+    lastScanTimeRef.current = now;
+    
     try {
       const r = await api.exeats.scan(trimmed);
       setResult(r);
     } catch {
       setResult({ kind: "invalid", message: "Network error. Try again." });
+    } finally {
+      processingRef.current = false;
     }
   }
 
@@ -101,8 +114,12 @@ export default function Security() {
     e.preventDefault();
     const code = manualCode.trim().toUpperCase();
     if (!code) return;
+    if (processingRef.current) return; // Prevent double submission
+    processingRef.current = true;
     setResult(null);
     await handleScan(code);
+    setManualCode(""); // Clear input after scan
+    processingRef.current = false;
   }
 
   const cfg = result ? getConfig(result.kind) : null;
@@ -118,6 +135,7 @@ export default function Security() {
         <div className="flex items-center gap-3">
           <span className="hidden sm:block text-sm text-[var(--color-muted-foreground)]">{user?.name}</span>
           <NotificationBell />
+          <ThemeToggle />
           <motion.button whileHover={{ scale: 1.05 }} onClick={logout}
             className="flex items-center gap-1.5 text-sm text-[var(--color-muted-foreground)] p-1.5 rounded-lg hover:bg-[var(--color-secondary)]">
             <LogOut className="w-4 h-4" />
