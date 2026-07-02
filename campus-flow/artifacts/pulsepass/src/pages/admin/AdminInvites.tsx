@@ -3,7 +3,7 @@ import { useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "../../lib/auth";
 import { api, type InviteDTO } from "../../lib/api";
-import { Link2, Copy, Check, Trash2, Plus, ArrowLeft, Clock, ShieldCheck, Briefcase, RefreshCw } from "lucide-react";
+import { Link2, Copy, Check, Trash2, Plus, ArrowLeft, Clock, ShieldCheck, Briefcase, RefreshCw, LogOut } from "lucide-react";
 import Logo from "../../components/Logo";
 import ThemeToggle from "../../components/ThemeToggle";
 
@@ -95,15 +95,16 @@ export default function AdminInvites() {
           <span className="font-bold text-gradient">PulsePass</span>
           <span className="hidden sm:block text-xs px-2 py-0.5 rounded-full bg-[oklch(0.72_0.18_250_/_0.2)] text-[oklch(0.72_0.18_250)] font-medium">Admin</span>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3">
           <ThemeToggle />
           <motion.button whileHover={{ scale: 1.05 }} onClick={() => nav("/admin")}
             className="flex items-center gap-1.5 text-xs text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)]">
-            <ArrowLeft className="w-3.5 h-3.5" /> Dashboard
+            <ArrowLeft className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Dashboard</span>
           </motion.button>
           <motion.button whileHover={{ scale: 1.05 }} onClick={logout}
             className="text-sm text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] p-1.5 rounded-lg hover:bg-[var(--color-secondary)]">
-            Logout
+            <span className="hidden sm:inline">Logout</span>
+            <LogOut className="w-4 h-4 sm:hidden" />
           </motion.button>
         </div>
       </header>

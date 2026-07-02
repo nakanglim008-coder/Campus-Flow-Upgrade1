@@ -94,22 +94,22 @@ export default function Admin() {
           <ThemeToggle />
           <motion.button whileHover={{ scale: 1.05 }}
             onClick={() => nav("/admin/security")}
-            className="flex items-center gap-1.5 text-xs text-[oklch(0.78_0.16_35)] hover:underline font-medium">
-            <ShieldCheck className="w-3.5 h-3.5" /> Security
+            className="hidden sm:flex items-center gap-1.5 text-xs text-[oklch(0.78_0.16_35)] hover:underline font-medium">
+            <ShieldCheck className="w-3.5 h-3.5" /> <span className="hidden md:inline">Security</span>
           </motion.button>
           <motion.button whileHover={{ scale: 1.05 }}
             onClick={() => nav("/admin/porters")}
-            className="flex items-center gap-1.5 text-xs text-[oklch(0.78_0.18_45)] hover:underline font-medium">
-            <Building2 className="w-3.5 h-3.5" /> Porters
+            className="hidden sm:flex items-center gap-1.5 text-xs text-[oklch(0.78_0.18_45)] hover:underline font-medium">
+            <Building2 className="w-3.5 h-3.5" /> <span className="hidden md:inline">Porters</span>
           </motion.button>
           <motion.button whileHover={{ scale: 1.05 }}
             onClick={() => nav("/admin/invites")}
-            className="flex items-center gap-1.5 text-xs text-[oklch(0.72_0.18_150)] hover:underline font-medium">
-            <Link2 className="w-3.5 h-3.5" /> Invites
+            className="hidden sm:flex items-center gap-1.5 text-xs text-[oklch(0.72_0.18_150)] hover:underline font-medium">
+            <Link2 className="w-3.5 h-3.5" /> <span className="hidden md:inline">Invites</span>
           </motion.button>
           <motion.button whileHover={{ scale: 1.05 }} onClick={logout}
             className="flex items-center gap-1.5 text-sm text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] p-1.5 rounded-lg hover:bg-[var(--color-secondary)]">
-            <LogOut className="w-4 h-4" /><span className="hidden sm:inline">Logout</span>
+            <LogOut className="w-4 h-4" />
           </motion.button>
         </div>
       </header>

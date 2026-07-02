@@ -3,6 +3,7 @@ import { useLocation } from "wouter";
 import { useAuth } from "../lib/auth";
 import { motion, useInView, useScroll, useTransform, AnimatePresence } from "framer-motion";
 import Logo from "../components/Logo";
+import ThemeToggle from "../components/ThemeToggle";
 import {
   ArrowRight, Shield, QrCode, ClipboardCheck, CheckCircle2,
   ChevronDown, Users, Lock, Smartphone, Zap, Eye, Bell, Globe,
@@ -169,14 +170,15 @@ export default function Landing() {
           </div>
 
           {/* Desktop nav */}
-          <nav className="hidden md:flex items-center gap-6 text-sm text-[var(--color-muted-foreground)]">
+          <nav className="hidden lg:flex items-center gap-6 text-sm text-[var(--color-muted-foreground)]">
             <a href="#how-it-works" className="hover:text-[var(--color-foreground)] transition-colors">How it works</a>
             <a href="#features" className="hover:text-[var(--color-foreground)] transition-colors">Features</a>
             <a href="#roles" className="hover:text-[var(--color-foreground)] transition-colors">Roles</a>
           </nav>
 
-          <div className="hidden md:flex items-center gap-3">
-            <button onClick={() => nav("/auth")} className="text-sm text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] transition-colors">Sign in</button>
+          <div className="hidden md:flex items-center gap-2">
+            <ThemeToggle />
+            <button onClick={() => nav("/auth")} className="text-sm text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] transition-colors px-3 py-2">Sign in</button>
             <motion.button
               whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
               onClick={() => nav("/auth")}
@@ -186,9 +188,12 @@ export default function Landing() {
             </motion.button>
           </div>
 
-          <button className="md:hidden p-2 rounded-lg hover:bg-[var(--color-secondary)]" onClick={() => setMobileNav(o => !o)}>
-            {mobileNav ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-          </button>
+          <div className="flex md:hidden items-center gap-2">
+            <ThemeToggle />
+            <button className="p-2 rounded-lg hover:bg-[var(--color-secondary)]" onClick={() => setMobileNav(o => !o)}>
+              {mobileNav ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+            </button>
+          </div>
         </div>
 
         {/* Mobile dropdown */}

@@ -11,8 +11,11 @@ const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [theme, setTheme] = useState<Theme>(() => {
-    const stored = localStorage.getItem("pulsepass_theme");
-    return (stored === "light" || stored === "dark") ? stored : "dark";
+    if (typeof window !== "undefined") {
+      const stored = localStorage.getItem("pulsepass_theme");
+      return (stored === "light" || stored === "dark") ? stored : "dark";
+    }
+    return "dark";
   });
 
   useEffect(() => {

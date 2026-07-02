@@ -3,7 +3,7 @@ import { useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "../../lib/auth";
 import { api, type SecurityOfficer } from "../../lib/api";
-import { ShieldCheck, Trash2, UserPlus, ArrowLeft, Eye, EyeOff } from "lucide-react";
+import { ShieldCheck, Trash2, UserPlus, ArrowLeft, Eye, EyeOff, LogOut } from "lucide-react";
 import Logo from "../../components/Logo";
 import ThemeToggle from "../../components/ThemeToggle";
 
@@ -66,12 +66,13 @@ export default function AdminSecurity() {
           <span className="font-bold text-gradient">PulsePass</span>
           <span className="hidden sm:block text-xs px-2 py-0.5 rounded-full bg-[oklch(0.72_0.18_250_/_0.2)] text-[oklch(0.72_0.18_250)] font-medium">Admin</span>
         </div>
-        <div className="flex items-center gap-3">
-          <span className="hidden sm:block text-sm text-[var(--color-muted-foreground)]">{user?.name}</span>
+        <div className="flex items-center gap-2 sm:gap-3">
+          <span className="hidden md:block text-sm text-[var(--color-muted-foreground)]">{user?.name}</span>
           <ThemeToggle />
           <motion.button whileHover={{ scale: 1.05 }} onClick={logout}
             className="text-sm text-[var(--color-muted-foreground)] p-1.5 rounded-lg hover:bg-[var(--color-secondary)]">
-            Logout
+            <span className="hidden sm:inline">Logout</span>
+            <LogOut className="w-4 h-4 sm:hidden" />
           </motion.button>
         </div>
       </header>
